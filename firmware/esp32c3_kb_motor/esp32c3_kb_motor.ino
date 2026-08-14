@@ -11,7 +11,7 @@
  * ------------------------------------------------------------------
  *  依赖库 (Arduino IDE 库管理器):
  *    - kode_bq27220           (已安装, 你现有的 BQ27220 库)
- *    - ESP32-BLE-Keyboard     (作者 t-vk, 搜 "ESP32-BLE-Keyboard" 安装)
+ *    - HijelHID_BLEKeyboard   (BLE HID 键盘, 基于 NimBLE-Arduino)
  * ------------------------------------------------------------------
  *  硬件接线 (建议, 以实际为准):
  *    BQ27220   SDA -> GPIO5   SCL -> GPIO6   (3.3V / GND)
@@ -27,7 +27,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <BQ27220.h>
-#include <BleKeyboard.h>
+#include <HijelHID_BLEKeyboard.h>
 
 // ============== 配置区 ==============
 // --- BQ27220 I2C ---
@@ -58,7 +58,7 @@ const unsigned long BATTERY_REPORT_MS = 5000;  // 主动上报电量周期
 // ==================================
 
 BQ27220 battery;
-BleKeyboard bleKb("SuperMini KB", "ESP32-C3", 100);
+HijelHID_BLEKeyboard bleKb("SuperMini KB", "ESP32-C3", 100);
 
 // 运行状态
 bool keyState[NUM_KEYS] = {false};        // 当前稳定按键状态
@@ -69,6 +69,24 @@ int motorSpeed[2] = {0, 0};               // 当前电机速度 -255..255
 char lineBuf[128];
 int lineLen = 0;
 unsigned long lastBatteryReport = 0;
+
+// ---------- BLE 键盘后端适配 ----------
+void bleKeyboardBegin() {
+  bleKb.setLogLevel(HIDLogLevel::Off);
+  bleKb.begin();
+}
+
+bool bleKeyboardReady() {
+  return bleKb.isPaired();
+}
+
+void bleKeyboardPress(uint8_t key) {
+  bleKb.press(key);
+}
+
+void bleKeyboardRelease(uint8_t key) {
+  bleKb.release(key);
+}
 
 // ---------- 电机 ----------
 void drivePwm(int p1, int p2, int speed) {   // speed -255..255
@@ -103,9 +121,9 @@ void setKeyState(int idx, bool pressed) {
   Serial.printf("EVT key k%d %s\r\n", idx + 1, pressed ? "DOWN" : "UP");
   Serial1.printf("EVT key k%d %s\r\n", idx + 1, pressed ? "DOWN" : "UP");
   // 通路2: BLE 键盘 (未连接时跳过, 不影响串口)
-  if (bleKb.isConnected()) {
-    if (pressed) bleKb.press(KEY_HID[idx]);
-    else         bleKb.release(KEY_HID[idx]);
+  if (bleKeyboardReady()) {
+    if (pressed) bleKeyboardPress(KEY_HID[idx]);
+    else         bleKeyboardRelease(KEY_HID[idx]);
   }
 }
 
@@ -156,7 +174,7 @@ void printStatusJson(Stream &s) {
   s.print("},\"keys\":{\"k1\":"); s.print(keyState[0] ? 1 : 0);
   s.print("},\"rgb\":["); s.print(rgbVal[0]); s.print(',');
   s.print(rgbVal[1]); s.print(','); s.print(rgbVal[2]);
-  s.print("],\"ble\":{\"connected\":"); s.print(bleKb.isConnected() ? 1 : 0);
+  s.print("],\"ble\":{\"connected\":"); s.print(bleKeyboardReady() ? 1 : 0);
   s.println("}}");
 }
 
@@ -267,7 +285,7 @@ void setup() {
   for (int i = 0; i < NUM_KEYS; i++) pinMode(BUTTON_PINS[i], INPUT_PULLUP);
 
   // BLE 键盘 (C3 仅支持 BLE)
-  bleKb.begin();
+  bleKeyboardBegin();
 
   Serial.println("READY");                 // USB 调试
   Serial1.println("READY");                // 上位机 UART

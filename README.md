@@ -6,6 +6,7 @@ VerdureBuddyRover 是一个面向小型移动机器人/绿植陪伴车的硬件�
 
 - [firmware/esp32c3_kb_motor](firmware/esp32c3_kb_motor): ESP32-C3 Arduino 固件。
 - [docs/serial-protocol.md](docs/serial-protocol.md): 固件与上位机之间的串口协议。
+- [docs/ble-keyboard-library.md](docs/ble-keyboard-library.md): BLE 键盘库崩溃原因和 NimBLE 迁移建议。
 - [hardware/README.md](hardware/README.md): 硬件接线与后续硬件资料目录规划。
 - [tools/host/README.md](tools/host/README.md): 预留的上位机调试工具目录。
 - [docs/project-structure.md](docs/project-structure.md): 仓库目录组织原则。
@@ -35,8 +36,8 @@ $env:ARDUINO_DIRECTORIES_USER="C:\arduino\Arduino"
 	"firmware\esp32c3_kb_motor"
 ```
 
-已验证当前固件在本机通过编译：约 51% Flash、5% RAM。
+已验证当前固件在本机通过编译：约 48% Flash、7% RAM。
 
 ## 依赖提示
 
-当前固件依赖 Arduino 库 `kode_bq27220` 和 `ESP32 BLE Keyboard`。本机 `ESP32 BLE Keyboard` 曾因 BLE 连接回调中空指针导致连接崩溃，已在本地库源码中加判空补丁；如果换机器或库管理器更新该库，请参考 [firmware/esp32c3_kb_motor/README.md](firmware/esp32c3_kb_motor/README.md) 的“已知问题与修复”。
+当前固件依赖 Arduino 库 `kode_bq27220`、`HijelHID_BLEKeyboard` 及其依赖 `NimBLE-Arduino`。项目不要求修改第三方库源码；此前 BLE 连接崩溃是旧 BLE 后端中 `BLE2902` 描述符空指针导致的，当前固件已移除旧 BLE 键盘库代码。说明见 [docs/ble-keyboard-library.md](docs/ble-keyboard-library.md)。

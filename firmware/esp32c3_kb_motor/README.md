@@ -7,9 +7,9 @@
 | 库 | 用途 | 当前状态 |
 |---|---|---|
 | `kode_bq27220` | BQ27220 电量计 | 本机位于 `C:\arduino\Arduino\libraries` |
-| `ESP32 BLE Keyboard` | BLE HID 键盘 | 本机目录 `ESP32_BLE_Keyboard`，已打 BLE 连接崩溃补丁 |
+| `HijelHID_BLEKeyboard` | BLE HID 键盘 | 必需；依赖 `NimBLE-Arduino` |
 
-> `ESP32 BLE Keyboard` 的本地补丁会被库管理器更新覆盖。长期建议评估 NimBLE 版本，以降低内存占用并避开旧 BLE 回调路径。
+> 项目不要求修改第三方库源码。之前的本地补丁只用于定位崩溃原因；当前固件已移除旧 BLE 键盘库代码，统一使用 `HijelHID_BLEKeyboard`。细节见 [../../docs/ble-keyboard-library.md](../../docs/ble-keyboard-library.md)。
 
 ## 硬件接线
 
@@ -59,7 +59,7 @@ key 1 1
 rgb 255 0 0
 ```
 
-## 已知问题与修复
+## 历史问题
 
 ### BLE 键盘连接崩溃
 
@@ -72,11 +72,13 @@ MEPC: 0x42001bec   MCAUSE: 0x00000005   MTVAL: 0x0000002c
 
 根因：`ESP32 BLE Keyboard` 库的 `BleKeyboard.cpp` 中，`onConnect()` / `onDisconnect()` 调用 `getDescriptorByUUID(BLEUUID(0x2902))` 可能返回空指针，未判空就调用 `desc->setNotifications(...)`，导致空指针解引用。
 
-本机修复方式：修改 `C:\arduino\Arduino\libraries\ESP32_BLE_Keyboard\src\BleKeyboard.cpp`：
+曾经通过在库源码里判空验证了问题点：
 
 ```cpp
 BLE2902* desc = (BLE2902*)this->inputKeyboard->getDescriptorByUUID(BLEUUID(0x2902));
 if (desc) desc->setNotifications(true);
 ```
 
-`onDisconnect()` 中设置 `false` 的位置也需要同样判空。更新库后需要重新检查补丁。
+`onDisconnect()` 中设置 `false` 的位置也存在同类风险。但这不是项目方案，因为库管理器更新会覆盖修改，也不利于其他机器复现。
+
+当前固件已改用 `HijelHID_BLEKeyboard`，不再包含旧 `ESP32 BLE Keyboard` 代码路径，也不需要修改第三方库源码。
