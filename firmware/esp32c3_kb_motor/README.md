@@ -52,12 +52,21 @@ help
 ping
 status
 battery
-motor 0 fwd 200
-motor 1 rev 160
-motor 0 stop
+forward 80
+back 60
+turn left 30
+drive -60 60
+stop
+led on
+led emotion happy
+led breathe 0 120 255 1600
 key 1 1
 rgb 255 0 0
 ```
+
+小智 MCP 的对接规则见 [../../docs/xiaozhi-mcp-serial-integration.md](../../docs/xiaozhi-mcp-serial-integration.md)。MCP 控制底盘时优先使用 `drive` 或 `forward/back/turn/stop`，不要拆成两条低层 `motor` 命令。
+
+桌面运行时固件将所有运动速度限制为最高 40%，包括前进、后退和原地转圈。RGB 灯支持常亮、呼吸、闪烁和 `happy/listening/thinking/charging/warning/error/working` 情绪预设。
 
 ## 历史问题
 

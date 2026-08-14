@@ -6,6 +6,7 @@ VerdureBuddyRover 是一个面向小型移动机器人/绿植陪伴车的硬件�
 
 - [firmware/esp32c3_kb_motor](firmware/esp32c3_kb_motor): ESP32-C3 Arduino 固件。
 - [docs/serial-protocol.md](docs/serial-protocol.md): 固件与上位机之间的串口协议。
+- [docs/xiaozhi-mcp-serial-integration.md](docs/xiaozhi-mcp-serial-integration.md): 小智 MCP 到小车串口命令的对接规则。
 - [docs/ble-keyboard-library.md](docs/ble-keyboard-library.md): BLE 键盘库崩溃原因和 NimBLE 迁移建议。
 - [hardware/README.md](hardware/README.md): 硬件接线与后续硬件资料目录规划。
 - [tools/host/README.md](tools/host/README.md): 预留的上位机调试工具目录。
@@ -36,7 +37,7 @@ $env:ARDUINO_DIRECTORIES_USER="C:\arduino\Arduino"
 	"firmware\esp32c3_kb_motor"
 ```
 
-已验证当前固件在本机通过编译：约 48% Flash、7% RAM。
+已验证当前固件在本机通过编译：约 49% Flash、7% RAM。
 
 ## 依赖提示
 
