@@ -28,6 +28,7 @@
 #include <Wire.h>
 #include <BQ27220.h>
 #include <HijelHID_BLEKeyboard.h>
+#include <NimBLEDevice.h>
 
 // ============== 配置区 ==============
 // --- BQ27220 I2C ---
@@ -50,7 +51,7 @@ const int NUM_KEYS = 1;
 const uint8_t BUTTON_PINS[NUM_KEYS] = {10};
 // HID 键盘 Usage ID: 0x28 = 回车
 const uint8_t KEY_HID[NUM_KEYS] = {0x28};
-const unsigned long DEBOUNCE_MS = 30;
+const unsigned long DEBOUNCE_MS = 50;
 
 // --- RGB5050 三色 LED (共阴 -> GND, analogWrite 0~255 调亮度) ---
 const int RGB_R = 2, RGB_G = 3, RGB_B = 9;
@@ -66,6 +67,7 @@ unsigned long ledPatternStarted = 0;
 const unsigned long BAUD = 115200;
 const int UART_TX = 20, UART_RX = 21;
 const unsigned long BATTERY_REPORT_MS = 5000;  // 主动上报电量周期
+const unsigned long BLE_HEALTH_CHECK_MS = 5000;
 // ==================================
 
 BQ27220 battery;
@@ -87,24 +89,41 @@ struct StreamInput {
 StreamInput usbInput;
 StreamInput uartInput;
 unsigned long lastBatteryReport = 0;
+unsigned long lastBleHealthCheck = 0;
 
 // ---------- BLE 键盘后端适配 ----------
+bool bleAdvertisingActive() {
+  if (!NimBLEDevice::isInitialized()) return false;
+  NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
+  return advertising != nullptr && advertising->isAdvertising();
+}
+
+bool ensureBleAdvertising() {
+  delay(50);
+  if (bleAdvertisingActive()) return true;
+
+  Serial.println("WARN BLE advertising inactive, retrying...");
+  if (!NimBLEDevice::startAdvertising()) {
+    Serial.println("ERR BLE advertising retry failed");
+    return false;
+  }
+  delay(50);
+  return bleAdvertisingActive();
+}
+
 void bleKeyboardBegin() {
   bleKb.setLogLevel(HIDLogLevel::Normal);
   Serial.println("BLE keyboard starting as SuperMini KB...");
   bleKb.begin();
+  Serial.printf("BLE advertising active=%d\r\n", ensureBleAdvertising() ? 1 : 0);
 }
 
 bool bleKeyboardReady() {
   return bleKb.isPaired();
 }
 
-void bleKeyboardPress(uint8_t key) {
-  bleKb.press(key);
-}
-
-void bleKeyboardRelease(uint8_t key) {
-  bleKb.release(key);
+void bleKeyboardTap(uint8_t key) {
+  bleKb.tap(key);
 }
 
 // ---------- 电机 ----------
@@ -237,11 +256,8 @@ void setKeyState(int idx, bool pressed) {
   // 通路1: 串口上报 (UART1 上位机 + USB 调试都发)
   Serial.printf("EVT key k%d %s\r\n", idx + 1, pressed ? "DOWN" : "UP");
   Serial1.printf("EVT key k%d %s\r\n", idx + 1, pressed ? "DOWN" : "UP");
-  // 通路2: BLE 键盘 (未连接时跳过, 不影响串口)
-  if (bleKeyboardReady()) {
-    if (pressed) bleKeyboardPress(KEY_HID[idx]);
-    else         bleKeyboardRelease(KEY_HID[idx]);
-  }
+  // 实体按钮每次稳定按下只发送一次完整按键，避免松开沿丢失导致主机持续重复回车
+  if (pressed && bleKeyboardReady()) bleKeyboardTap(KEY_HID[idx]);
 }
 
 void pollButtons() {
@@ -362,17 +378,21 @@ void handleCommand(String &line, Stream &out) {
     action.toLowerCase();
     if (action == "restart") {
       bleKb.end();
+      delay(50);
       bleKb.begin();
-      out.println("OK ble advertising restarted name=SuperMini KB");
+      if (ensureBleAdvertising()) out.println("OK ble advertising restarted name=SuperMini KB");
+      else out.println("ERR ble advertising restart failed");
     } else if (action == "clear") {
-      bleKb.clearBonds();
       bleKb.end();
+      delay(50);
+      bleKb.clearBonds();
       bleKb.begin();
-      out.println("OK ble bonds cleared; advertising restarted name=SuperMini KB");
+      if (ensureBleAdvertising()) out.println("OK ble bonds cleared; advertising restarted name=SuperMini KB");
+      else out.println("ERR ble bonds cleared but advertising restart failed");
     } else if (action.length() == 0 || action == "status") {
-      out.printf("ble connected=%d paired=%d bonded=%d name=SuperMini KB\r\n",
-                 bleKb.isConnected() ? 1 : 0, bleKb.isPaired() ? 1 : 0,
-                 bleKb.isBonded() ? 1 : 0);
+      out.printf("ble advertising=%d connected=%d paired=%d bonded=%d name=SuperMini KB\r\n",
+                 bleAdvertisingActive() ? 1 : 0, bleKb.isConnected() ? 1 : 0,
+                 bleKb.isPaired() ? 1 : 0, bleKb.isBonded() ? 1 : 0);
     } else {
       out.println("ERR ble usage: ble [status|restart|clear]");
     }
@@ -516,7 +536,10 @@ void processStream(Stream &s, StreamInput &input) {
 void setup() {
   Serial.begin(BAUD);                                   // USB CDC 仅调试
   Serial1.begin(BAUD, SERIAL_8N1, UART_RX, UART_TX);    // 上位机协议 (UART1)
-  delay(200);
+  delay(500);                                           // 等待冷启动电源稳定
+
+  // BLE 不依赖 USB 串口连接，优先初始化以保证冷启动即可广播
+  bleKeyboardBegin();
 
   // I2C + BQ27220 (ESP32 需显式指定 SDA/SCL)
   Wire.begin(I2C_SDA, I2C_SCL);
@@ -547,9 +570,6 @@ void setup() {
   // 按键 (内部上拉, 按下=低)
   for (int i = 0; i < NUM_KEYS; i++) pinMode(BUTTON_PINS[i], INPUT_PULLUP);
 
-  // BLE 键盘 (C3 仅支持 BLE)
-  bleKeyboardBegin();
-
   Serial.println("READY");                 // USB 调试
   Serial1.println("READY");                // 上位机 UART
   printHelp(Serial);
@@ -561,6 +581,12 @@ void loop() {
   updateLedPattern();     // 非阻塞更新 RGB 情绪/动画
   processStream(Serial, usbInput);  // USB 调试口命令
   processStream(Serial1, uartInput); // 上位机 UART1 命令
+
+  // 未连接且广播意外停止时自动恢复，不依赖打开 USB 串口触发复位
+  if (millis() - lastBleHealthCheck >= BLE_HEALTH_CHECK_MS) {
+    lastBleHealthCheck = millis();
+    if (!bleKb.isConnected() && !bleAdvertisingActive()) ensureBleAdvertising();
+  }
 
   // 周期主动上报电量
   if (millis() - lastBatteryReport >= BATTERY_REPORT_MS) {

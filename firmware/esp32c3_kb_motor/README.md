@@ -18,7 +18,7 @@
 | BQ27220 | SDA=GPIO5, SCL=GPIO6 | 3.3V/GND |
 | DRV8833 电机A | AIN1=GPIO0, AIN2=GPIO1 | VCC/VMOT 接电机电源，需共地 |
 | DRV8833 电机B | BIN1=GPIO4, BIN2=GPIO7 | N20 3-6V 电机可用 15kHz PWM 降低噪声 |
-| 按键 x1 | GPIO10 -> GND | 内部上拉，按下为低，当前映射 Enter |
+| 按键 x1 | GPIO10 -> GND | 内部上拉，按下为低，当前映射 Enter；电机干扰明显时可在按键两端并联 0.1 µF 陶瓷电容 |
 | RGB5050 | R=GPIO2, G=GPIO3, B=GPIO9 | 共阴接 GND，三路需串限流电阻 |
 | 上位机串口 | UART1 TX=GPIO20, RX=GPIO21 | 115200 8N1，需 USB-TTL 共地 |
 
@@ -69,7 +69,7 @@ rgb 255 0 0
 
 固件默认将 `drive`、`forward`、`back`、`turn` 等底盘动作限制为最高 80%，可用 `limit <0-100>` 临时调整；低层 `motor` 命令直接使用 `0..255` PWM，仅用于单电机调试。RGB 灯支持常亮、呼吸、闪烁和 `happy/listening/thinking/charging/warning/error/working` 情绪预设。
 
-BLE 键盘在开机后会启动广播，手机或电脑负责配对和自动回连。首次使用或更换 BLE 库后，建议删除系统里的旧 `SuperMini KB` 配对记录，重新搜索并配对；可用 `status` 查看 `ble.connected` 是否为 `1`。
+BLE 键盘在开机后会启动广播，手机或电脑负责配对和自动回连。BLE 初始化不依赖打开 USB 串口监视器；固件在未连接且广播意外停止时会每 5 秒自动恢复广播。首次使用或更换 BLE 库后，建议删除系统里的旧 `SuperMini KB` 配对记录，重新搜索并配对；可用 `status` 查看 `ble.connected` 是否为 `1`。
 
 ## 历史问题
 

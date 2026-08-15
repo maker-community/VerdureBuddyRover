@@ -29,7 +29,7 @@
 | `ping` | `ping` | `OK ping` |
 | `status` | `status` | 状态 JSON |
 | `battery` | `battery` | `battery level=87 charging=1 discharging=0` |
-| `ble` | `ble` | `ble connected=1 paired=1 bonded=1 name=SuperMini KB` |
+| `ble` | `ble` | `ble advertising=1 connected=0 paired=0 bonded=0 name=SuperMini KB` |
 | `ble restart` | `ble restart` | `OK ble advertising restarted name=SuperMini KB` |
 | `ble clear` | `ble clear` | `OK ble bonds cleared; advertising restarted name=SuperMini KB` |
 | `drive` | `drive 80 80` | `OK drive left=80 right=80` |
@@ -88,7 +88,7 @@
 - `rgb`: RGB5050 三通道亮度，范围 `0..255`。
 - `ble.connected`: BLE 键盘是否已连接。
 
-BLE 键盘开机后会广播为 `SuperMini KB`。如果系统扫描不到设备，先检查启动日志是否出现 `[HijelHID] Advertising as "SuperMini KB"`，再发送 `ble restart` 重启广播。配对缓存异常时，在手机/电脑删除旧设备后发送 `ble clear`，然后重新扫描配对。
+BLE 键盘开机后会广播为 `SuperMini KB`。如果系统扫描不到设备，发送 `ble` 检查 `advertising`：值为 `1` 才表示 NimBLE 底层确认正在广播；库输出的 `[HijelHID] Advertising as "SuperMini KB"` 只表示已发起广播。`advertising=0 connected=1` 表示键盘已经连接，因此正常停止广播；仅当 `advertising=0 connected=0` 时发送 `ble restart`，固件会重试并在仍失败时返回 `ERR`。配对缓存异常时，在手机/电脑删除旧设备后发送 `ble clear`，然后重新扫描配对。
 
 ## 底盘控制
 
