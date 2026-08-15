@@ -40,6 +40,10 @@ const int CHARGE_THRESHOLD_MA = 30;   // 判定充/放电的电流阈值 (mA)
 const int AIN1 = 0, AIN2 = 1;         // 电机A
 const int BIN1 = 4, BIN2 = 7;         // 电机B
 const int DEFAULT_DRIVE_SPEED_LIMIT_PERCENT = 80; // 默认底盘动作限速
+const unsigned long MOTOR_DIRECTION_DEADTIME_MS = 20;
+const uint32_t MOTOR_PWM_FREQUENCY = 15000;
+const uint8_t PWM_RESOLUTION_BITS = 8;
+const uint8_t MOTOR_PWM_CHANNELS[2] = {0, 1};
 
 // --- 按键 -> BLE 键盘码 (HID Usage ID), 现在只保留 1 个 = 回车 ---
 const int NUM_KEYS = 1;
@@ -50,6 +54,8 @@ const unsigned long DEBOUNCE_MS = 30;
 
 // --- RGB5050 三色 LED (共阴 -> GND, analogWrite 0~255 调亮度) ---
 const int RGB_R = 2, RGB_G = 3, RGB_B = 9;
+const uint8_t RGB_PWM_CHANNELS[3] = {2, 3, 4};
+const uint32_t RGB_PWM_FREQUENCY = 1000;
 uint8_t rgbVal[3] = {0, 0, 0};        // 当前 RGB (0-255)
 enum LedMode { LED_OFF, LED_SOLID, LED_BREATHE, LED_BLINK };
 LedMode ledMode = LED_OFF;
@@ -70,6 +76,7 @@ bool keyState[NUM_KEYS] = {false};        // 当前稳定按键状态
 bool debState[NUM_KEYS] = {false};        // 去抖中间状态
 unsigned long debTime[NUM_KEYS] = {0};
 int motorSpeed[2] = {0, 0};               // 当前电机速度 -255..255
+int motorPwmPin[2] = {AIN1, BIN1};
 int driveSpeedLimitPercent = DEFAULT_DRIVE_SPEED_LIMIT_PERCENT;
 
 struct StreamInput {
@@ -101,17 +108,44 @@ void bleKeyboardRelease(uint8_t key) {
 }
 
 // ---------- 电机 ----------
-void drivePwm(int p1, int p2, int speed) {   // speed -255..255
-  if (speed == 0)        { analogWrite(p1, 0);    analogWrite(p2, 0); }
-  else if (speed > 0)    { analogWrite(p1, speed); analogWrite(p2, 0); }
-  else                   { analogWrite(p1, 0);    analogWrite(p2, -speed); }
+bool drivePwm(int id, int speed) {   // speed -255..255
+  int p1 = id == 0 ? AIN1 : BIN1;
+  int p2 = id == 0 ? AIN2 : BIN2;
+  int activePin = speed < 0 ? p2 : p1;
+  int inactivePin = speed < 0 ? p1 : p2;
+  uint8_t channel = MOTOR_PWM_CHANNELS[id];
+
+  if (speed == 0) {
+    return ledcWriteChannel(channel, 0);
+  }
+
+  if (motorPwmPin[id] != activePin) {
+    ledcWriteChannel(channel, 0);
+    ledcDetach(motorPwmPin[id]);
+    pinMode(motorPwmPin[id], OUTPUT);
+    digitalWrite(motorPwmPin[id], LOW);
+    pinMode(inactivePin, OUTPUT);
+    digitalWrite(inactivePin, LOW);
+    if (!ledcAttachChannel(activePin, MOTOR_PWM_FREQUENCY, PWM_RESOLUTION_BITS, channel)) {
+      Serial.printf("ERR motor %d PWM attach failed on GPIO%d\r\n", id, activePin);
+      Serial1.printf("ERR motor %d PWM attach failed on GPIO%d\r\n", id, activePin);
+      return false;
+    }
+    motorPwmPin[id] = activePin;
+  }
+
+  return ledcWriteChannel(channel, abs(speed));
 }
 
 void setMotor(int id, int speed) {
   if (speed > 255) speed = 255;
   if (speed < -255) speed = -255;
-  if (id == 0) { motorSpeed[0] = speed; drivePwm(AIN1, AIN2, speed); }
-  else if (id == 1) { motorSpeed[1] = speed; drivePwm(BIN1, BIN2, speed); }
+  if (id < 0 || id > 1) return;
+  if ((motorSpeed[id] > 0 && speed < 0) || (motorSpeed[id] < 0 && speed > 0)) {
+    drivePwm(id, 0);
+    delay(MOTOR_DIRECTION_DEADTIME_MS);
+  }
+  if (drivePwm(id, speed)) motorSpeed[id] = speed;
 }
 
 void setDrive(int left, int right) {
@@ -131,9 +165,9 @@ int percentToPwm(int percent) {
 
 // ---------- RGB5050 三色 LED (共阴) ----------
 void applyRgb(int r, int g, int b) {
-  analogWrite(RGB_R, r);
-  analogWrite(RGB_G, g);
-  analogWrite(RGB_B, b);
+  ledcWriteChannel(RGB_PWM_CHANNELS[0], r);
+  ledcWriteChannel(RGB_PWM_CHANNELS[1], g);
+  ledcWriteChannel(RGB_PWM_CHANNELS[2], b);
 }
 
 void setRgb(int r, int g, int b) {
@@ -484,10 +518,6 @@ void setup() {
   Serial1.begin(BAUD, SERIAL_8N1, UART_RX, UART_TX);    // 上位机协议 (UART1)
   delay(200);
 
-  // RGB5050 (共阴)
-  pinMode(RGB_R, OUTPUT); pinMode(RGB_G, OUTPUT); pinMode(RGB_B, OUTPUT);
-  setRgb(0, 0, 0);                                     // 默认熄灭
-
   // I2C + BQ27220 (ESP32 需显式指定 SDA/SCL)
   Wire.begin(I2C_SDA, I2C_SCL);
   if (!battery.begin(Wire, BQ_ADDR, I2C_SDA, I2C_SCL, 400000)) {
@@ -497,11 +527,22 @@ void setup() {
   // DRV8833
   pinMode(AIN1, OUTPUT); pinMode(AIN2, OUTPUT);
   pinMode(BIN1, OUTPUT); pinMode(BIN2, OUTPUT);
-  // N20 减速电机 (3~6V): PWM 提到 15kHz, 减少低转速"吱吱"噪音
-  analogWriteFrequency(AIN1, 15000);
-  analogWriteFrequency(AIN2, 15000);
-  analogWriteFrequency(BIN1, 15000);
-  analogWriteFrequency(BIN2, 15000);
+  digitalWrite(AIN1, LOW); digitalWrite(AIN2, LOW);
+  digitalWrite(BIN1, LOW); digitalWrite(BIN2, LOW);
+  if (!ledcAttachChannel(AIN1, MOTOR_PWM_FREQUENCY, PWM_RESOLUTION_BITS, MOTOR_PWM_CHANNELS[0]) ||
+      !ledcAttachChannel(BIN1, MOTOR_PWM_FREQUENCY, PWM_RESOLUTION_BITS, MOTOR_PWM_CHANNELS[1])) {
+    Serial.println("ERR motor PWM initialization failed");
+  }
+  ledcWriteChannel(MOTOR_PWM_CHANNELS[0], 0);
+  ledcWriteChannel(MOTOR_PWM_CHANNELS[1], 0);
+
+  // RGB5050 (共阴): 固定使用 3 个 LEDC 通道，避免 ESP32-C3 的 6 通道上限冲突
+  if (!ledcAttachChannel(RGB_R, RGB_PWM_FREQUENCY, PWM_RESOLUTION_BITS, RGB_PWM_CHANNELS[0]) ||
+      !ledcAttachChannel(RGB_G, RGB_PWM_FREQUENCY, PWM_RESOLUTION_BITS, RGB_PWM_CHANNELS[1]) ||
+      !ledcAttachChannel(RGB_B, RGB_PWM_FREQUENCY, PWM_RESOLUTION_BITS, RGB_PWM_CHANNELS[2])) {
+    Serial.println("ERR RGB PWM initialization failed");
+  }
+  setRgb(0, 0, 0);                                     // 默认熄灭
 
   // 按键 (内部上拉, 按下=低)
   for (int i = 0; i < NUM_KEYS; i++) pinMode(BUTTON_PINS[i], INPUT_PULLUP);
