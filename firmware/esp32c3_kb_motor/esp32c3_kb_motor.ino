@@ -40,7 +40,8 @@ const int CHARGE_THRESHOLD_MA = 30;   // 判定充/放电的电流阈值 (mA)
 // --- DRV8833 双电机 (2 输入脚/路, analogWrite 0~255) ---
 const int AIN1 = 0, AIN2 = 1;         // 电机A
 const int BIN1 = 4, BIN2 = 7;         // 电机B
-const int DEFAULT_DRIVE_SPEED_LIMIT_PERCENT = 80; // 默认底盘动作限速
+const int DEFAULT_DRIVE_SPEED_PERCENT = 100;
+const int DEFAULT_DRIVE_SPEED_LIMIT_PERCENT = 100; // 默认底盘动作限速
 const unsigned long MOTOR_DIRECTION_DEADTIME_MS = 20;
 const uint32_t MOTOR_PWM_FREQUENCY = 15000;
 const uint8_t PWM_RESOLUTION_BITS = 8;
@@ -70,8 +71,10 @@ const unsigned long BATTERY_REPORT_MS = 5000;  // 主动上报电量周期
 const unsigned long BLE_HEALTH_CHECK_MS = 1000;
 // ==================================
 
+const char BLE_DEVICE_NAME[] = "Verdure Buddy Rover";
+
 BQ27220 battery;
-HijelHID_BLEKeyboard bleKb("SuperMini KB", "ESP32-C3", 100);
+HijelHID_BLEKeyboard bleKb(BLE_DEVICE_NAME, "Verdure", 100);
 
 // 运行状态
 bool keyState[NUM_KEYS] = {false};        // 当前稳定按键状态
@@ -113,7 +116,7 @@ bool ensureBleAdvertising() {
 
 void bleKeyboardBegin() {
   bleKb.setLogLevel(HIDLogLevel::Normal);
-  Serial.println("BLE keyboard starting as SuperMini KB...");
+  Serial.printf("BLE keyboard starting as %s...\r\n", BLE_DEVICE_NAME);
   bleKb.begin();
   Serial.printf("BLE advertising active=%d\r\n", ensureBleAdvertising() ? 1 : 0);
 }
@@ -380,19 +383,19 @@ void handleCommand(String &line, Stream &out) {
       bleKb.end();
       delay(50);
       bleKb.begin();
-      if (ensureBleAdvertising()) out.println("OK ble advertising restarted name=SuperMini KB");
+      if (ensureBleAdvertising()) out.printf("OK ble advertising restarted name=%s\r\n", BLE_DEVICE_NAME);
       else out.println("ERR ble advertising restart failed");
     } else if (action == "clear") {
       bleKb.end();
       delay(50);
       bleKb.clearBonds();
       bleKb.begin();
-      if (ensureBleAdvertising()) out.println("OK ble bonds cleared; advertising restarted name=SuperMini KB");
+      if (ensureBleAdvertising()) out.printf("OK ble bonds cleared; advertising restarted name=%s\r\n", BLE_DEVICE_NAME);
       else out.println("ERR ble bonds cleared but advertising restart failed");
     } else if (action.length() == 0 || action == "status") {
-      out.printf("ble advertising=%d connected=%d paired=%d bonded=%d name=SuperMini KB\r\n",
+      out.printf("ble advertising=%d connected=%d paired=%d bonded=%d name=%s\r\n",
                  bleAdvertisingActive() ? 1 : 0, bleKb.isConnected() ? 1 : 0,
-                 bleKb.isPaired() ? 1 : 0, bleKb.isBonded() ? 1 : 0);
+             bleKb.isPaired() ? 1 : 0, bleKb.isBonded() ? 1 : 0, BLE_DEVICE_NAME);
     } else {
       out.println("ERR ble usage: ble [status|restart|clear]");
     }
@@ -409,7 +412,7 @@ void handleCommand(String &line, Stream &out) {
     sendDriveAck(out);
   } else if (cmd == "forward" || cmd == "back") {
     int speed = 0;
-    if (!parseSpeed(arg, 80, speed)) {
+    if (!parseSpeed(arg, DEFAULT_DRIVE_SPEED_PERCENT, speed)) {
       out.println("ERR speed must be 0..100");
       return;
     }
@@ -425,7 +428,7 @@ void handleCommand(String &line, Stream &out) {
     int speed = 0;
     direction.toLowerCase();
     if ((direction != "left" && direction != "right") ||
-        !parseSpeed(speedArg, 60, speed)) {
+      !parseSpeed(speedArg, DEFAULT_DRIVE_SPEED_PERCENT, speed)) {
       out.println("ERR turn usage: turn <left|right> [0-100]");
       return;
     }

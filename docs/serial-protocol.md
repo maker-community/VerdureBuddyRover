@@ -19,7 +19,7 @@
 | `self.led.set_color(red, green, blue)` | `rgb <red> <green> <blue>` |
 | `self.led.off()` | `led off` |
 
-速度统一为 `0..100` 百分比，底盘动作默认限速为 `80`，可用 `limit <0-100>` 临时调整。固件内部再换算为 DRV8833 的 `0..255` PWM。
+速度统一为 `0..100` 百分比，底盘动作默认速度和限速均为 `100`，可用 `limit <0-100>` 临时调整。固件内部再换算为 DRV8833 的 `0..255` PWM。
 
 ## 命令
 
@@ -29,9 +29,9 @@
 | `ping` | `ping` | `OK ping` |
 | `status` | `status` | 状态 JSON |
 | `battery` | `battery` | `battery level=87 charging=1 discharging=0` |
-| `ble` | `ble` | `ble advertising=1 connected=0 paired=0 bonded=0 name=SuperMini KB` |
-| `ble restart` | `ble restart` | `OK ble advertising restarted name=SuperMini KB` |
-| `ble clear` | `ble clear` | `OK ble bonds cleared; advertising restarted name=SuperMini KB` |
+| `ble` | `ble` | `ble advertising=1 connected=0 paired=0 bonded=0 name=Verdure Buddy Rover` |
+| `ble restart` | `ble restart` | `OK ble advertising restarted name=Verdure Buddy Rover` |
+| `ble clear` | `ble clear` | `OK ble bonds cleared; advertising restarted name=Verdure Buddy Rover` |
 | `drive` | `drive 80 80` | `OK drive left=80 right=80` |
 | `forward` | `forward 80` | `OK drive left=80 right=80` |
 | `back` | `back 60` | `OK drive left=-60 right=-60` |
@@ -71,7 +71,7 @@
     "mode": "solid",
     "period_ms": 1600
   },
-  "speed_limit": 80,
+  "speed_limit": 100,
   "ble": {
     "connected": 1
   }
@@ -83,12 +83,12 @@
 - `battery.level`: 电量百分比，读取失败时固件归零。
 - `battery.charging` / `battery.discharging`: 0 或 1，通过平均电流阈值判断。
 - `motor.m0` / `motor.m1`: 当前左右轮速度百分比，范围 `-100..100`。
-- `speed_limit`: 当前固件实际允许的最高底盘动作速度百分比，默认值为 `80`，可用 `limit <0-100>` 调整。
+- `speed_limit`: 当前固件实际允许的最高底盘动作速度百分比，默认值为 `100`，可用 `limit <0-100>` 调整。
 - `keys.k1`: 当前按键稳定状态，1 表示按下。
 - `rgb`: RGB5050 三通道亮度，范围 `0..255`。
 - `ble.connected`: BLE 键盘是否已连接。
 
-BLE 键盘开机后会广播为 `SuperMini KB`。如果系统扫描不到设备，发送 `ble` 检查 `advertising`：值为 `1` 才表示 NimBLE 底层确认正在广播；库输出的 `[HijelHID] Advertising as "SuperMini KB"` 只表示已发起广播。`advertising=0 connected=1` 表示键盘已经连接，因此正常停止广播；仅当 `advertising=0 connected=0` 时发送 `ble restart`，固件会重试并在仍失败时返回 `ERR`。配对缓存异常时，在手机/电脑删除旧设备后发送 `ble clear`，然后重新扫描配对。
+BLE 键盘开机后会广播为 `Verdure Buddy Rover`。如果系统扫描不到设备，发送 `ble` 检查 `advertising`：值为 `1` 才表示 NimBLE 底层确认正在广播；库输出的 `[HijelHID] Advertising as "Verdure Buddy Rover"` 只表示已发起广播。`advertising=0 connected=1` 表示键盘已经连接，因此正常停止广播；仅当 `advertising=0 connected=0` 时发送 `ble restart`，固件会重试并在仍失败时返回 `ERR`。配对缓存异常时，在手机/电脑删除旧设备后发送 `ble clear`，然后重新扫描配对。
 
 ## 底盘控制
 
@@ -114,7 +114,7 @@ turn <left|right> [speed]
 stop
 ```
 
-`turn left` 和 `turn right` 会让左右轮反向转动，实现原地左转/右转。`spin` 是 `turn` 的同义词。省略速度时，前进/后退默认 `80`，转向默认 `60`，但最终都会被当前 `speed_limit` 截断。
+`turn left` 和 `turn right` 会让左右轮反向转动，实现原地左转/右转。`spin` 是 `turn` 的同义词。省略速度时，前进、后退和转向均默认 `100`，但最终都会被当前 `speed_limit` 截断。
 
 ### 底盘限速
 
@@ -122,10 +122,10 @@ stop
 limit <0-100>
 ```
 
-默认 `speed_limit` 为 `80`。如果需要更保守的桌面测试，可以临时降低限速；如果车轮在 `forward 80` 时没有足够起步扭矩，但低层 `motor 0 fwd 255` 能转，可以临时提高限速：
+默认 `speed_limit` 为 `100`。如果需要更保守的桌面测试，可以临时降低限速：
 
 ```text
-limit 100
+limit 80
 forward 80
 ```
 
