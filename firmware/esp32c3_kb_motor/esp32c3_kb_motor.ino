@@ -39,7 +39,7 @@ const int CHARGE_THRESHOLD_MA = 30;   // 判定充/放电的电流阈值 (mA)
 // --- DRV8833 双电机 (2 输入脚/路, analogWrite 0~255) ---
 const int AIN1 = 0, AIN2 = 1;         // 电机A
 const int BIN1 = 4, BIN2 = 7;         // 电机B
-const int MAX_DRIVE_SPEED_PERCENT = 40; // 桌面运行安全上限
+const int DEFAULT_DRIVE_SPEED_LIMIT_PERCENT = 80; // 默认底盘动作限速
 
 // --- 按键 -> BLE 键盘码 (HID Usage ID), 现在只保留 1 个 = 回车 ---
 const int NUM_KEYS = 1;
@@ -70,6 +70,7 @@ bool keyState[NUM_KEYS] = {false};        // 当前稳定按键状态
 bool debState[NUM_KEYS] = {false};        // 去抖中间状态
 unsigned long debTime[NUM_KEYS] = {0};
 int motorSpeed[2] = {0, 0};               // 当前电机速度 -255..255
+int driveSpeedLimitPercent = DEFAULT_DRIVE_SPEED_LIMIT_PERCENT;
 
 struct StreamInput {
   char buffer[128];
@@ -82,7 +83,8 @@ unsigned long lastBatteryReport = 0;
 
 // ---------- BLE 键盘后端适配 ----------
 void bleKeyboardBegin() {
-  bleKb.setLogLevel(HIDLogLevel::Off);
+  bleKb.setLogLevel(HIDLogLevel::Normal);
+  Serial.println("BLE keyboard starting as SuperMini KB...");
   bleKb.begin();
 }
 
@@ -120,7 +122,7 @@ void setDrive(int left, int right) {
 }
 
 int limitDriveSpeed(int speed) {
-  return constrain(speed, -MAX_DRIVE_SPEED_PERCENT, MAX_DRIVE_SPEED_PERCENT);
+  return constrain(speed, -driveSpeedLimitPercent, driveSpeedLimitPercent);
 }
 
 int percentToPwm(int percent) {
@@ -257,7 +259,7 @@ void printStatusJson(Stream &s) {
   s.print(rgbVal[1]); s.print(','); s.print(rgbVal[2]);
   s.print("],\"led\":{\"mode\":\""); s.print(ledModeName());
   s.print("\",\"period_ms\":"); s.print(ledPeriodMs);
-  s.print("},\"speed_limit\":"); s.print(MAX_DRIVE_SPEED_PERCENT);
+  s.print("},\"speed_limit\":"); s.print(driveSpeedLimitPercent);
   s.print(",\"ble\":{\"connected\":"); s.print(bleKeyboardReady() ? 1 : 0);
   s.println("}}");
 }
@@ -267,10 +269,14 @@ void printHelp(Stream &s) {
   s.println("Commands (case-insensitive):");
   s.println("  status                  - full status JSON (battery/motor/keys/rgb/ble)");
   s.println("  battery                 - battery only: level/charging/discharging");
+  s.println("  ble                     - BLE connected/paired/bonded status");
+  s.println("  ble restart             - restart BLE advertising");
+  s.println("  ble clear               - clear bonds and restart advertising");
   s.println("  drive <left> <right>    - drive both motors, -100..100");
   s.println("  forward [speed]         - move forward, speed 0..100");
   s.println("  back [speed]            - move backward, speed 0..100");
-  s.println("  turn|spin <left|right> [speed] - turn in place, max 40");
+  s.println("  turn|spin <left|right> [speed] - turn in place, limited by speed_limit");
+  s.println("  limit <0-100>          - set drive speed limit percent");
   s.println("  stop                    - stop both motors");
   s.println("  motor <0|1> <fwd|rev|stop> [0-255] - low-level motor control");
   s.println("  key <1> <0|1>           - simulate button (debug, key1=Enter)");
@@ -316,6 +322,26 @@ void handleCommand(String &line, Stream &out) {
     printStatusJson(out);
   } else if (cmd == "battery") {
     reportBattery(out);
+  } else if (cmd == "ble") {
+    String action = arg;
+    action.trim();
+    action.toLowerCase();
+    if (action == "restart") {
+      bleKb.end();
+      bleKb.begin();
+      out.println("OK ble advertising restarted name=SuperMini KB");
+    } else if (action == "clear") {
+      bleKb.clearBonds();
+      bleKb.end();
+      bleKb.begin();
+      out.println("OK ble bonds cleared; advertising restarted name=SuperMini KB");
+    } else if (action.length() == 0 || action == "status") {
+      out.printf("ble connected=%d paired=%d bonded=%d name=SuperMini KB\r\n",
+                 bleKb.isConnected() ? 1 : 0, bleKb.isPaired() ? 1 : 0,
+                 bleKb.isBonded() ? 1 : 0);
+    } else {
+      out.println("ERR ble usage: ble [status|restart|clear]");
+    }
   } else if (cmd == "drive") {
     int left = 0, right = 0;
     if (sscanf(arg.c_str(), "%d %d", &left, &right) != 2 ||
@@ -354,6 +380,14 @@ void handleCommand(String &line, Stream &out) {
     if (direction == "left") setDrive(-value, value);
     else setDrive(value, -value);
     sendDriveAck(out);
+  } else if (cmd == "limit" || cmd == "speedlimit") {
+    int limit = -1;
+    if (sscanf(arg.c_str(), "%d", &limit) != 1 || limit < 0 || limit > 100) {
+      out.println("ERR limit usage: limit <0-100>");
+      return;
+    }
+    driveSpeedLimitPercent = limit;
+    out.printf("OK limit=%d\r\n", driveSpeedLimitPercent);
   } else if (cmd == "stop") {
     setDrive(0, 0);
     sendDriveAck(out);
@@ -367,12 +401,11 @@ void handleCommand(String &line, Stream &out) {
     if (id != 0 && id != 1) { out.println("ERR bad motor id"); return; }
     String d = String(dir); d.toLowerCase();
     speed = constrain(speed, 0, 255);
-    speed = min(speed, percentToPwm(MAX_DRIVE_SPEED_PERCENT));
     if (d == "stop")        setMotor(id, 0);
     else if (d == "fwd")    setMotor(id, speed);
     else if (d == "rev")    setMotor(id, -speed);
     else { out.println("ERR bad motor dir"); return; }
-    out.printf("OK motor %d\r\n", id);
+    out.printf("OK motor %d pwm=%d\r\n", id, abs(motorSpeed[id]));
   } else if (cmd == "key") {
     int id = 0, st = 0;
     if (sscanf(arg.c_str(), "%d %d", &id, &st) == 2 && id == 1) {
@@ -430,12 +463,13 @@ void handleCommand(String &line, Stream &out) {
 void processStream(Stream &s, StreamInput &input) {
   while (s.available()) {
     char c = s.read();
-    if (c == '\n') {
+    if (c == '\n' || c == '\r') {
+      if (input.length == 0) continue;
       input.buffer[input.length] = '\0';
       String line = String(input.buffer);
       input.length = 0;
       handleCommand(line, s);
-    } else if (c != '\r' && input.length < (int)sizeof(input.buffer) - 1) {
+    } else if (input.length < (int)sizeof(input.buffer) - 1) {
       input.buffer[input.length++] = c;
     } else if (input.length >= (int)sizeof(input.buffer) - 1) {
       input.length = 0;

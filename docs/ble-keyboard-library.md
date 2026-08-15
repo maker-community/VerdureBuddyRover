@@ -49,6 +49,8 @@ NimBLE 另一个好处是资源占用通常比 Bluedroid 更低，更适合 ESP3
 4. 删除手机/电脑上旧的蓝牙配对记录，重新搜索并配对 `SuperMini KB`。
 5. 验证按键按下/抬起时，串口仍输出 `EVT key k1 DOWN/UP`，主机也收到 Enter 键。
 
+固件启用 `HIDLogLevel::Normal` 后，广播成功时串口会输出 `[HijelHID] Advertising as "SuperMini KB"`。可用 `ble` 查看连接、配对和 bond 状态，使用 `ble restart` 重启广播，或使用 `ble clear` 清除板端 bond 后重新广播。
+
 ## 后续演进
 
 如果后续 BLE 键盘功能变复杂，例如需要多键组合、媒体键、鼠标、游戏手柄或自定义 HID 报告，可以考虑把 BLE HID 封装成仓库内的独立模块，直接基于 `NimBLE-Arduino` 写 HID 服务。这样依赖更少、可控性更强，但初期改动会比当前方案大。

@@ -56,6 +56,7 @@ forward 80
 back 60
 turn left 30
 drive -60 60
+limit 80
 stop
 led on
 led emotion happy
@@ -66,7 +67,9 @@ rgb 255 0 0
 
 小智 MCP 的对接规则见 [../../docs/xiaozhi-mcp-serial-integration.md](../../docs/xiaozhi-mcp-serial-integration.md)。MCP 控制底盘时优先使用 `drive` 或 `forward/back/turn/stop`，不要拆成两条低层 `motor` 命令。
 
-桌面运行时固件将所有运动速度限制为最高 40%，包括前进、后退和原地转圈。RGB 灯支持常亮、呼吸、闪烁和 `happy/listening/thinking/charging/warning/error/working` 情绪预设。
+固件默认将 `drive`、`forward`、`back`、`turn` 等底盘动作限制为最高 80%，可用 `limit <0-100>` 临时调整；低层 `motor` 命令直接使用 `0..255` PWM，仅用于单电机调试。RGB 灯支持常亮、呼吸、闪烁和 `happy/listening/thinking/charging/warning/error/working` 情绪预设。
+
+BLE 键盘在开机后会启动广播，手机或电脑负责配对和自动回连。首次使用或更换 BLE 库后，建议删除系统里的旧 `SuperMini KB` 配对记录，重新搜索并配对；可用 `status` 查看 `ble.connected` 是否为 `1`。
 
 ## 历史问题
 

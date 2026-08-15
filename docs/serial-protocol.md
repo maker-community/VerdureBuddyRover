@@ -2,7 +2,7 @@
 
 当前固件通过 UART1 与上位机通信：TX=GPIO20，RX=GPIO21，波特率 115200，8N1。USB CDC `Serial` 同时支持调试输入输出，但正式上位机建议使用 UART1。
 
-协议为行式文本：上位机发送一行命令，以 `\r\n` 或 `\n` 结束；固件返回文本或 JSON。
+协议为行式文本：上位机发送一行命令，以 `\r\n`、`\n` 或 `\r` 结束；固件返回文本或 JSON。只写入 `forward 80` 但不发送行结束符时，固件会继续等待这一行结束，不会立即执行命令。
 
 ## MCP 控制原则
 
@@ -10,16 +10,16 @@
 
 | MCP 工具 | 串口命令 |
 |---|---|
-| `self.chassis.go_forward(speed)` | `forward <speed>`，固件限制最高 40 |
-| `self.chassis.go_back(speed)` | `back <speed>`，固件限制最高 40 |
-| `self.chassis.turn_left(speed)` | `turn left <speed>`，固件限制最高 40 |
-| `self.chassis.turn_right(speed)` | `turn right <speed>`，固件限制最高 40 |
+| `self.chassis.go_forward(speed)` | `forward <speed>`，受当前 `speed_limit` 限制 |
+| `self.chassis.go_back(speed)` | `back <speed>`，受当前 `speed_limit` 限制 |
+| `self.chassis.turn_left(speed)` | `turn left <speed>`，受当前 `speed_limit` 限制 |
+| `self.chassis.turn_right(speed)` | `turn right <speed>`，受当前 `speed_limit` 限制 |
 | `self.chassis.stop()` | `stop` |
 | `self.chassis.get_status()` | `status` |
 | `self.led.set_color(red, green, blue)` | `rgb <red> <green> <blue>` |
 | `self.led.off()` | `led off` |
 
-速度统一为 `0..100` 百分比，但桌面安全上限固定为 `40`。即使上位机误发 `100`，固件也只会以 `40` 执行。固件内部再换算为 DRV8833 的 `0..255` PWM。
+速度统一为 `0..100` 百分比，底盘动作默认限速为 `80`，可用 `limit <0-100>` 临时调整。固件内部再换算为 DRV8833 的 `0..255` PWM。
 
 ## 命令
 
@@ -29,12 +29,16 @@
 | `ping` | `ping` | `OK ping` |
 | `status` | `status` | 状态 JSON |
 | `battery` | `battery` | `battery level=87 charging=1 discharging=0` |
+| `ble` | `ble` | `ble connected=1 paired=1 bonded=1 name=SuperMini KB` |
+| `ble restart` | `ble restart` | `OK ble advertising restarted name=SuperMini KB` |
+| `ble clear` | `ble clear` | `OK ble bonds cleared; advertising restarted name=SuperMini KB` |
 | `drive` | `drive 80 80` | `OK drive left=80 right=80` |
 | `forward` | `forward 80` | `OK drive left=80 right=80` |
 | `back` | `back 60` | `OK drive left=-60 right=-60` |
 | `turn` / `spin` | `turn left 30` | `OK drive left=-30 right=30` |
 | `stop` | `stop` | `OK drive left=0 right=0` |
-| `motor` | `motor 0 fwd 200` | `OK motor 0` |
+| `limit` | `limit 80` | `OK limit=80` |
+| `motor` | `motor 0 fwd 200` | `OK motor 0 pwm=200` |
 | `led` | `led on` / `led off` | `OK led state=1` / `OK led state=0` |
 | `led emotion` | `led emotion happy` | `OK led emotion=happy mode=breathe` |
 | `led breathe` | `led breathe 0 120 255 1600` | `OK led mode=breathe` |
@@ -67,7 +71,7 @@
     "mode": "solid",
     "period_ms": 1600
   },
-  "speed_limit": 40,
+  "speed_limit": 80,
   "ble": {
     "connected": 1
   }
@@ -79,10 +83,12 @@
 - `battery.level`: 电量百分比，读取失败时固件归零。
 - `battery.charging` / `battery.discharging`: 0 或 1，通过平均电流阈值判断。
 - `motor.m0` / `motor.m1`: 当前左右轮速度百分比，范围 `-100..100`。
-- `speed_limit`: 当前固件实际允许的最高速度百分比，桌面版本为 `40`。
+- `speed_limit`: 当前固件实际允许的最高底盘动作速度百分比，默认值为 `80`，可用 `limit <0-100>` 调整。
 - `keys.k1`: 当前按键稳定状态，1 表示按下。
 - `rgb`: RGB5050 三通道亮度，范围 `0..255`。
 - `ble.connected`: BLE 键盘是否已连接。
+
+BLE 键盘开机后会广播为 `SuperMini KB`。如果系统扫描不到设备，先检查启动日志是否出现 `[HijelHID] Advertising as "SuperMini KB"`，再发送 `ble restart` 重启广播。配对缓存异常时，在手机/电脑删除旧设备后发送 `ble clear`，然后重新扫描配对。
 
 ## 底盘控制
 
@@ -108,7 +114,20 @@ turn <left|right> [speed]
 stop
 ```
 
-`turn left` 和 `turn right` 会让左右轮反向转动，实现原地左转/右转。`spin` 是 `turn` 的同义词。省略速度时，前进/后退默认 `80`，转向默认 `60`，但最终都会被桌面安全上限 `40` 截断。
+`turn left` 和 `turn right` 会让左右轮反向转动，实现原地左转/右转。`spin` 是 `turn` 的同义词。省略速度时，前进/后退默认 `80`，转向默认 `60`，但最终都会被当前 `speed_limit` 截断。
+
+### 底盘限速
+
+```text
+limit <0-100>
+```
+
+默认 `speed_limit` 为 `80`。如果需要更保守的桌面测试，可以临时降低限速；如果车轮在 `forward 80` 时没有足够起步扭矩，但低层 `motor 0 fwd 255` 能转，可以临时提高限速：
+
+```text
+limit 100
+forward 80
+```
 
 ## 低层电机控制
 
@@ -124,7 +143,7 @@ motor 1 rev 160
 motor 0 stop
 ```
 
-固件会把速度限制在 `-255..255`。`stop` 会忽略速度参数并停止对应电机。
+固件会把速度限制在 `0..255`。`stop` 会忽略速度参数并停止对应电机。该低层调试命令直接使用 PWM 值，不走 `forward` / `drive` 的 `speed_limit` 限速。
 
 该命令仅用于底层调试，不建议 MCP 使用。MCP 应使用上面的 `drive` 或语义化动作命令。
 

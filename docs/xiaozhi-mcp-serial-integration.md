@@ -6,7 +6,7 @@
 
 | MCP 工具 | 参数 | 串口命令 |
 |---|---|---|
-| `self.chassis.go_forward` | `speed=0..100` | `forward <speed>`，固件最高执行 40 |
+| `self.chassis.go_forward` | `speed=0..100` | `forward <speed>`，受当前 `speed_limit` 限制 |
 | `self.chassis.go_back` | `speed=0..100` | `back <speed>`，固件最高执行 40 |
 | `self.chassis.turn_left` | `speed=0..100` | `turn left <speed>`，固件最高执行 40 |
 | `self.chassis.turn_right` | `speed=0..100` | `turn right <speed>`，固件最高执行 40 |
