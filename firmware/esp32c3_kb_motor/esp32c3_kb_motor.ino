@@ -67,7 +67,7 @@ unsigned long ledPatternStarted = 0;
 const unsigned long BAUD = 115200;
 const int UART_TX = 20, UART_RX = 21;
 const unsigned long BATTERY_REPORT_MS = 5000;  // 主动上报电量周期
-const unsigned long BLE_HEALTH_CHECK_MS = 5000;
+const unsigned long BLE_HEALTH_CHECK_MS = 1000;
 // ==================================
 
 BQ27220 battery;
@@ -536,7 +536,7 @@ void processStream(Stream &s, StreamInput &input) {
 void setup() {
   Serial.begin(BAUD);                                   // USB CDC 仅调试
   Serial1.begin(BAUD, SERIAL_8N1, UART_RX, UART_TX);    // 上位机协议 (UART1)
-  delay(500);                                           // 等待冷启动电源稳定
+  delay(100);                                           // 等待冷启动电源稳定
 
   // BLE 不依赖 USB 串口连接，优先初始化以保证冷启动即可广播
   bleKeyboardBegin();

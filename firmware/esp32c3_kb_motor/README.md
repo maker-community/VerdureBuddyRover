@@ -69,7 +69,7 @@ rgb 255 0 0
 
 固件默认将 `drive`、`forward`、`back`、`turn` 等底盘动作限制为最高 80%，可用 `limit <0-100>` 临时调整；低层 `motor` 命令直接使用 `0..255` PWM，仅用于单电机调试。RGB 灯支持常亮、呼吸、闪烁和 `happy/listening/thinking/charging/warning/error/working` 情绪预设。
 
-BLE 键盘在开机后会启动广播，手机或电脑负责配对和自动回连。BLE 初始化不依赖打开 USB 串口监视器；固件在未连接且广播意外停止时会每 5 秒自动恢复广播。首次使用或更换 BLE 库后，建议删除系统里的旧 `SuperMini KB` 配对记录，重新搜索并配对；可用 `status` 查看 `ble.connected` 是否为 `1`。
+BLE 键盘在开机后会启动广播，手机或电脑负责配对和自动回连。BLE 初始化不依赖打开 USB 串口监视器；固件在未连接且广播意外停止时会每 1 秒自动恢复广播。首次使用或更换 BLE 库后，建议删除系统里的旧 `SuperMini KB` 配对记录，重新搜索并配对；可用 `status` 查看 `ble.connected` 是否为 `1`。
 
 ## 历史问题
 
