@@ -10,7 +10,7 @@ VerdureBuddyRover 是一个面向小型移动机器人/绿植陪伴车的硬件�
 
 ![show image](hardware/enclosure/images/back.png)
 
-外壳模型源文件与 3D 打印文件见 [hardware/enclosure](hardware/enclosure) 目录。
+外壳渲染图见 [hardware/enclosure](hardware/enclosure) 目录，STL 打印文件与 Fusion 360 源文件托管在模型仓库 [VerdureLab](https://github.com/maker-community/VerdureLab/tree/main/verdure-buddy-rover)。
 
 ## 当前内容
 
@@ -60,3 +60,11 @@ $env:ARDUINO_DIRECTORIES_USER="C:\arduino\Arduino"
 ## 依赖提示
 
 当前固件依赖 Arduino 库 `kode_bq27220`、`HijelHID_BLEKeyboard` 及其依赖 `NimBLE-Arduino`。项目不要求修改第三方库源码；此前 BLE 连接崩溃是旧 BLE 后端中 `BLE2902` 描述符空指针导致的，当前固件已移除旧 BLE 键盘库代码。说明见 [docs/ble-keyboard-library.md](docs/ble-keyboard-library.md)。
+
+## 社区与交流
+
+- 模型仓库（外壳 STL / Fusion 360 源文件）：https://github.com/maker-community/VerdureLab/tree/main/verdure-buddy-rover
+- 主项目仓库：https://github.com/maker-community/VerdureBuddyRover
+- Gitee 镜像：https://gitee.com/maker-community/VerdureLab
+- B站：https://space.bilibili.com/25228512
+- DIY QQ 交流群：`1023487000`
