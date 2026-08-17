@@ -2,6 +2,13 @@
 
 小智 `atom-echos3r` 上位机通过 UART1 控制 ESP32-C3 小车板。建议 MCP 工具只负责生成高层动作，串口层只发送一行命令并等待一行结果。
 
+## 上位机固件参考
+
+小智上位机固件使用专用分支 `verdure-buddy-rover`，对应板卡目录为 M5Stack Atom Echo S3R：
+
+- 固件分支：https://github.com/maker-community/xiaozhi-esp32/tree/verdure-buddy-rover
+- 板卡目录（M5Stack Atom Echo S3R）：https://github.com/maker-community/xiaozhi-esp32/tree/verdure-buddy-rover/main/boards/m5stack/atom-echos3r
+
 ## MCP 到串口映射
 
 | MCP 工具 | 参数 | 串口命令 |

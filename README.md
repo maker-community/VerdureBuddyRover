@@ -2,6 +2,16 @@
 
 VerdureBuddyRover 是一个面向小型移动机器人/绿植陪伴车的硬件与软件仓库。当前已整合第一版 ESP32-C3 SuperMini 综合固件，包含 BQ27220 电池计量、DRV8833 双电机控制、BLE 蓝牙键盘按键上报、RGB5050 指示灯，以及面向上位机的 UART 行式调试协议。
 
+## 项目简介
+
+一个圆滚滚的可爱小车机器人，可以跟你对话聊天，也能用语音控制它前进、后退、转向，是一个能陪你玩、听你话的小车伙伴。
+
+![show image](hardware/enclosure/images/face.png)
+
+![show image](hardware/enclosure/images/back.png)
+
+外壳模型源文件与 3D 打印文件见 [hardware/enclosure](hardware/enclosure) 目录。
+
 ## 当前内容
 
 - [firmware/esp32c3_kb_motor](firmware/esp32c3_kb_motor): ESP32-C3 Arduino 固件。
@@ -11,6 +21,14 @@ VerdureBuddyRover 是一个面向小型移动机器人/绿植陪伴车的硬件�
 - [hardware/README.md](hardware/README.md): 硬件接线与后续硬件资料目录规划。
 - [tools/host/README.md](tools/host/README.md): 预留的上位机调试工具目录。
 - [docs/project-structure.md](docs/project-structure.md): 仓库目录组织原则。
+
+## 上位机固件分支
+
+小智上位机固件使用专用分支 `verdure-buddy-rover`，对应板卡目录为 M5Stack Atom Echo S3R：
+
+- 固件分支：https://github.com/maker-community/xiaozhi-esp32/tree/verdure-buddy-rover
+- 板卡目录（M5Stack Atom Echo S3R）：https://github.com/maker-community/xiaozhi-esp32/tree/verdure-buddy-rover/main/boards/m5stack/atom-echos3r
+- 串口对接说明：[docs/xiaozhi-mcp-serial-integration.md](docs/xiaozhi-mcp-serial-integration.md)
 
 ## 推荐目录结构
 
@@ -31,7 +49,7 @@ Arduino IDE：打开 [firmware/esp32c3_kb_motor/esp32c3_kb_motor.ino](firmware/e
 ```powershell
 $env:ARDUINO_DIRECTORIES_DATA="C:\arduino\Arduino15"
 $env:ARDUINO_DIRECTORIES_USER="C:\arduino\Arduino"
-& "C:\Users\张广建\AppData\Local\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe" compile `
+& "$env:USERPROFILE\AppData\Local\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe" compile `
 	--fqbn esp32:esp32:esp32c3 `
 	--build-path "C:\arduino\build_verdurebuddy_esp32c3" `
 	"firmware\esp32c3_kb_motor"

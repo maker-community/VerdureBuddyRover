@@ -2,6 +2,16 @@
 
 这里存放 VerdureBuddyRover 的硬件资料。当前固件对应的硬件连接如下，后续可以按硬件版本继续拆分。
 
+## 外壳 (Enclosure)
+
+圆滚滚的可爱小车外壳，可 3D 打印，渲染图如下：
+
+![正面](enclosure/images/face.png)
+
+![背面](enclosure/images/back.png)
+
+模型源文件与 3D 打印文件见 [enclosure](enclosure) 目录。
+
 ## 当前接线
 
 | 模块 | ESP32-C3 引脚 | 说明 |

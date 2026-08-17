@@ -35,7 +35,7 @@ USB CDC `Serial` 主要用于烧录和调试；上位机正式协议走 UART1 `S
 ```powershell
 $env:ARDUINO_DIRECTORIES_DATA="C:\arduino\Arduino15"
 $env:ARDUINO_DIRECTORIES_USER="C:\arduino\Arduino"
-& "C:\Users\张广建\AppData\Local\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe" compile `
+& "$env:USERPROFILE\AppData\Local\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe" compile `
   --fqbn esp32:esp32:esp32c3 `
   --build-path "C:\arduino\build_verdurebuddy_esp32c3" `
   "firmware\esp32c3_kb_motor"
